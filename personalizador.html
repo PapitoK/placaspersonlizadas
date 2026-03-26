@@ -3,145 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Processador Coisoteca</title>
+    <title>Coisoteca | Validador 1mm</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
     <style>
         :root { --red: #D23B40; --cream: #FAF8F5; --charcoal: #231F20; }
-        body { font-family: 'DM Sans', sans-serif; background: var(--cream); text-align: center; padding: 20px; color: var(--charcoal); }
-        .box { background: white; max-width: 500px; margin: auto; padding: 40px; border-radius: 24px; border: 1px solid #ddd; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        .upload-area { border: 2px dashed #ccc; border-radius: 16px; padding: 40px 20px; cursor: pointer; position: relative; background: #fff; transition: 0.3s; margin-bottom: 20px; }
-        .upload-area.dragover { border-color: var(--red); background: #FFF5F5; }
-        .upload-area input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-        .progress-container { width: 100%; background: #eee; height: 12px; border-radius: 10px; margin: 20px 0; display: none; overflow: hidden; }
-        .progress-bar { width: 0%; height: 100%; background: var(--red); transition: width 0.2s; }
-        #status-text { font-size: 14px; font-weight: bold; margin-bottom: 10px; min-height: 20px; }
-        #btn-down { background: var(--charcoal); color: white; padding: 20px; width: 100%; border-radius: 12px; cursor: pointer; display: none; border: none; font-weight: bold; font-size: 16px; }
-        .specs { font-size: 12px; color: #888; margin-top: 15px; }
+        body { font-family: sans-serif; background: var(--cream); text-align: center; padding: 20px; }
+        .box { background: white; max-width: 500px; margin: auto; padding: 30px; border-radius: 20px; border: 1px solid #ddd; }
+        .upload-area { border: 2px dashed #ccc; padding: 30px; border-radius: 15px; cursor: pointer; position: relative; }
+        #preview-container { width: 100%; aspect-ratio: 5/1; background: #eee; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ddd; }
+        #preview-img { max-width: 90%; max-height: 80%; }
+        .progress-container { width: 100%; background: #eee; height: 10px; border-radius: 10px; margin: 20px 0; display: none; }
+        .progress-bar { width: 0%; height: 100%; background: var(--red); transition: 0.3s; }
+        #status { font-weight: bold; margin: 15px 0; font-size: 14px; }
+        #warning-log { font-size: 12px; color: #856404; background: #fff3cd; border-radius: 8px; padding: 10px; display: none; margin-bottom: 10px; text-align: left; }
+        #btn-down { background: var(--charcoal); color: white; padding: 18px; width: 100%; border-radius: 12px; cursor: pointer; display: none; border: none; font-weight: bold; }
         canvas { display: none; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <div style="background:var(--red); color:white; font-size:10px; padding:4px 12px; display:inline-block; border-radius:4px; margin-bottom:15px; font-weight:bold; letter-spacing:1px;">COISOTECA</div>
-    <h1 style="font-family:'Syne';">Processador de Placa</h1>
-    <p style="font-size:14px; color:#666;">Formatos aceitos: <b>PDF, PNG ou JPG</b><br>Tamanho obrigatório: <b>25x5cm (300 DPI)</b></p>
+    <div style="background:var(--red); color:white; font-size:10px; padding:4px 10px; display:inline-block; border-radius:4px; margin-bottom:10px; font-weight:bold;">COISOTECA</div>
+    <h2>Validador de Impressão</h2>
+    <p style="font-size:12px; color:#666;">Aviso: traços menores que <b>1mm</b> podem não ser impressos corretamente.</p>
 
     <div class="upload-area" id="drop-zone">
-        <input type="file" id="fInput" accept="image/png, image/jpeg, application/pdf">
-        <div><b>Clique para selecionar</b><br>ou arraste o arquivo aqui</div>
+        <input type="file" id="fInput" accept="image/*, application/pdf">
+        <strong>Subir arte (25x5cm)</strong>
     </div>
 
-    <div id="status-text">Aguardando arquivo...</div>
+    <div id="preview-container"><img id="preview-img"></div>
     <div class="progress-container" id="p-cont"><div class="progress-bar" id="p-bar"></div></div>
+    
+    <div id="status">Aguardando arquivo...</div>
+    <div id="warning-log"></div>
 
-    <button id="btn-down">BAIXAR PNG PRETO E BRANCO</button>
-    <div class="specs">Resolução alvo: 2953 x 591 pixels</div>
+    <button id="btn-down">BAIXAR ARQUIVO VALIDADO</button>
     <canvas id="c"></canvas>
 </div>
 
 <script>
-    const pdfjsLib = window['pdfjs-dist/build/pdf'];
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-    const dropZone = document.getElementById('drop-zone');
     const fInput = document.getElementById('fInput');
-    const statusText = document.getElementById('status-text');
+    const status = document.getElementById('status');
+    const warningLog = document.getElementById('warning-log');
     const pBar = document.getElementById('p-bar');
     const pCont = document.getElementById('p-cont');
     const btnDown = document.getElementById('btn-down');
+    const previewContainer = document.getElementById('preview-container');
+    const previewImg = document.getElementById('preview-img');
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
 
-    const TARGET_W = 2953;
-    const TARGET_H = 591;
+    const TARGET_W = 2953; // 25cm @ 300dpi
+    const TARGET_H = 591;  // 5cm @ 300dpi
+    const MIN_LINE_PX = 11; // Aprox 1mm (12px é 1.01mm)
 
-    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragover'); };
-    dropZone.ondragleave = () => dropZone.classList.remove('dragover');
-    dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); };
     fInput.onchange = (e) => handleFile(e.target.files[0]);
-
-    function updateProgress(msg, percent, color = "#666") {
-        statusText.innerText = msg; statusText.style.color = color;
-        pCont.style.display = 'block'; pBar.style.width = percent + '%';
-    }
 
     async function handleFile(file) {
         if (!file) return;
         btnDown.style.display = 'none';
-        updateProgress("Lendo arquivo...", 20);
+        warningLog.style.display = 'none';
+        pCont.style.display = 'block';
+        updateUI("Processando...", 20, "var(--charcoal)");
 
+        // Lógica de leitura (PDF ou Imagem) idêntica à anterior...
         if (file.type === "application/pdf") {
-            processPDF(file);
-        } else {
-            processImageFile(file);
-        }
-    }
-
-    function processImageFile(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => validateAndProcess(img);
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-
-    async function processPDF(file) {
-        try {
+            const pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
             const page = await pdf.getPage(1);
-            const viewport = page.getViewport({ scale: 4 }); // Escala alta para manter DPI
-
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
+            const viewport = page.getViewport({ scale: 4 });
+            canvas.width = viewport.width; canvas.height = viewport.height;
             await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
             const img = new Image();
             img.onload = () => validateAndProcess(img);
             img.src = canvas.toDataURL();
-        } catch (e) {
-            updateProgress("❌ Erro ao ler PDF.", 100, "red");
+        } else {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.onload = () => validateAndProcess(img);
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
         }
     }
 
-    function validateAndProcess(img) {
-        const diffW = Math.abs(img.width - TARGET_W);
-        const diffH = Math.abs(img.height - TARGET_H);
+    function updateUI(msg, percent, color) {
+        status.innerText = msg;
+        status.style.color = color;
+        pBar.style.width = percent + '%';
+    }
 
-        if (diffW > 50 || diffH > 50) { // Margem de erro pequena
-            updateProgress(`❌ Tamanho incorreto: ${img.width}x${img.height}px. Use 2953x591px.`, 100, "red");
+    function validateAndProcess(img) {
+        if (Math.abs(img.width - TARGET_W) > 150) {
+            updateUI("❌ Tamanho errado. Use 25x5cm em 300DPI.", 100, "red");
             return;
         }
 
-        updateProgress("Aplicando filtro Preto e Branco...", 70);
-        canvas.width = TARGET_W;
-        canvas.height = TARGET_H;
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        canvas.width = TARGET_W; canvas.height = TARGET_H;
+        ctx.fillStyle = "white"; ctx.fillRect(0, 0, TARGET_W, TARGET_H);
         ctx.drawImage(img, 0, 0, TARGET_W, TARGET_H);
 
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, TARGET_W, TARGET_H);
         const data = imgData.data;
+        
+        // 1. Aplicar Threshold (Preto e Branco) e Limpar Template Cinza
         for (let i = 0; i < data.length; i += 4) {
             const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            const v = avg > 127 ? 255 : 0;
+            const v = avg < 120 ? 0 : 255;
             data[i] = data[i+1] = data[i+2] = v;
         }
-        ctx.putImageData(imgData, 0, 0);
 
-        setTimeout(() => {
-            updateProgress("✅ Arte validada!", 100, "green");
-            btnDown.style.display = 'block';
-        }, 500);
+        // 2. CHECAGEM DE ESPESSURA (Amostragem Horizontal)
+        let thinPoints = 0;
+        for (let y = 0; y < TARGET_H; y += 10) { // Pula linhas para performance
+            let rowCount = 0;
+            for (let x = 0; x < TARGET_W; x++) {
+                const idx = (y * TARGET_W + x) * 4;
+                if (data[idx] === 0) {
+                    rowCount++;
+                } else {
+                    if (rowCount > 0 && rowCount < MIN_LINE_PX) thinPoints++;
+                    rowCount = 0;
+                }
+            }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
+        previewImg.src = canvas.toDataURL("image/png");
+        previewContainer.style.display = 'flex';
+
+        if (thinPoints > 30) { // Tolerância de ruído
+            warningLog.innerHTML = "⚠️ <b>Atenção:</b> Detectamos traços muito finos (menores que 1mm). Eles podem não aparecer na impressão 3D.";
+            warningLog.style.display = 'block';
+            updateUI("⚠️ Analisado com ressalvas", 100, "#856404");
+        } else {
+            updateUI("✅ Perfeito para impressão!", 100, "green");
+        }
+        
+        btnDown.style.display = 'block';
     }
 
     btnDown.onclick = () => {
         const link = document.createElement('a');
-        link.download = 'placa-coisoteca-final.png';
+        link.download = 'placa-validada-coisoteca.png';
         link.href = canvas.toDataURL("image/png");
         link.click();
     };
