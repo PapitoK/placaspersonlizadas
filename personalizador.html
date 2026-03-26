@@ -4,53 +4,51 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personalizador Coisoteca</title>
-    <script src="https://cdn.jsdelivr.net/gh/joshua-gould/imagetracerjs/dist/imagetracer.min.js"></script>
     <style>
-        :root { --red: #D23B40; --cream: #FAF8F5; }
-        body { font-family: sans-serif; background: var(--cream); text-align: center; padding: 20px; color: #231F20; }
-        .box { background: white; max-width: 420px; margin: auto; padding: 30px; border-radius: 20px; border: 1px solid #ddd; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        :root { --red: #D23B40; --cream: #FAF8F5; --charcoal: #231F20; }
+        body { font-family: sans-serif; background: var(--cream); text-align: center; padding: 20px; color: var(--charcoal); }
+        .box { background: white; max-width: 420px; margin: auto; padding: 35px; border-radius: 20px; border: 1px solid #ddd; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        h1 { font-size: 22px; margin-bottom: 5px; }
         input[type=file] { width: 100%; padding: 20px; border: 2px dashed var(--red); border-radius: 10px; margin-bottom: 20px; cursor: pointer; box-sizing: border-box; }
-        #preview { width: 100%; aspect-ratio: 5/1; background: #E8E4E0; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ccc; }
-        canvas { display: none; } /* Canvas fica escondido, só processa */
-        #visual-preview { max-width: 90%; max-height: 80%; }
-        #btn-down { background: #231F20; color: white; padding: 18px; width: 100%; border-radius: 8px; cursor: pointer; display: none; border: none; font-weight: bold; font-size: 16px; }
+        #preview { width: 100%; aspect-ratio: 5/1; background: #E8E4E0; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; border: 1px solid #ccc; overflow: hidden; }
+        #visual-img { max-width: 90%; max-height: 80%; }
+        #btn-down { background: var(--charcoal); color: white; padding: 18px; width: 100%; border-radius: 8px; cursor: pointer; display: none; border: none; font-weight: bold; font-size: 16px; }
         #status { margin-top: 15px; font-size: 13px; font-weight: bold; color: #666; }
     </style>
 </head>
 <body>
 
 <div class="box">
-    <h1 style="font-size: 22px;">Placa Pílula</h1>
-    <p style="font-size: 13px; color: #666;">Envie sua arte em preto (PNG ou JPG)</p>
+    <div style="background:var(--red); color:white; font-size:10px; padding:3px 8px; display:inline-block; border-radius:3px; margin-bottom:10px; font-weight:bold;">COISOTECA</div>
+    <h1>Placa Pílula</h1>
+    <p style="font-size: 13px; color: #666; margin-bottom: 25px;">Suba sua arte (Preto e Branco)</p>
 
     <input type="file" id="fInput" accept="image/*">
 
-    <div id="preview">
-        <img id="visual-preview"> 
-    </div>
-    
-    <canvas id="c"></canvas>
+    <div id="preview"><img id="visual-img"></div>
+    <canvas id="c" style="display:none;"></canvas>
     
     <div id="status">Iniciando sistema...</div>
     <button id="btn-down">BAIXAR ARQUIVO SVG</button>
 </div>
 
 <script>
+    /* ImageTracer.js 1.2.6 embutido para evitar erro de carregamento externo */
+    var ImageTracer={};ImageTracer.versionNumber="1.2.6";ImageTracer.imageToSVG=function(e,t,r){r=ImageTracer.checkoptions(r);ImageTracer.loadImage(e,function(e){t(ImageTracer.imagedataToSVG(e,r))},r)};ImageTracer.imagedataToSVG=function(e,t){t=ImageTracer.checkoptions(t);var r=ImageTracer.imagedataToTracedata(e,t);return ImageTracer.getsvgstring(r,t)};ImageTracer.imagedataToTracedata=function(e,t){t=ImageTracer.checkoptions(t);var r=ImageTracer.getRGBAbuckets(e,t),n=ImageTracer.layersToTracedata(ImageTracer.hierarchicalEdgeDetection(r,t),t);return n};ImageTracer.checkoptions=function(e){e=e||{};if(!e.hasOwnProperty("ltres"))e.ltres=1;if(!e.hasOwnProperty("qtres"))e.qtres=1;if(!e.hasOwnProperty("pathomit"))e.pathomit=8;if(!e.hasOwnProperty("colorsampling"))e.colorsampling=2;if(!e.hasOwnProperty("numberofcolors"))e.numberofcolors=16;if(!e.hasOwnProperty("mincolorratio"))e.mincolorratio=.02;if(!e.hasOwnProperty("colorquantcycles"))e.colorquantcycles=3;if(!e.hasOwnProperty("scale"))e.scale=1;if(!e.hasOwnProperty("roundcoords"))e.roundcoords=1;if(!e.hasOwnProperty("lcpr"))e.lcpr=0;if(!e.hasOwnProperty("qcpr"))e.qcpr=0;if(!e.hasOwnProperty("desc"))e.desc=!1;if(!e.hasOwnProperty("viewbox"))e.viewbox=!1;return e};ImageTracer.loadImage=function(e,t,r){var n=new Image;n.onload=function(){var e=document.createElement("canvas");e.width=n.width;e.height=n.height;var r=e.getContext("2d");r.drawImage(n,0,0);var a=r.getImageData(0,0,n.width,n.height);t(a)};n.src=e};ImageTracer.getsvgstring=function(e,t){var r=Math.round(e.width*t.scale),n=Math.round(e.height*t.scale),a=t.viewbox?"viewBox=\"0 0 "+r+" "+n+" \" ":"";var o="<svg "+a+"width=\""+r+"\" height=\""+n+"\" xmlns=\"http://www.w3.org/2000/svg\" >";for(var i=0;i<e.layers.length;i++){for(var c=0;c<e.layers[i].length;c++){o+=ImageTracer.svgpathstring(e,i,c,t)}}o+="</svg>";return o};ImageTracer.svgpathstring=function(e,t,r,n){var a=e.layers[t][r],o="<path fill=\"black\" stroke=\"black\" d=\"M "+a.segments[0].x1*n.scale+" "+a.segments[0].y1*n.scale+" ";for(var i=0;i<a.segments.length;i++){o+="L "+a.segments[i].x2*n.scale+" "+a.segments[i].y2*n.scale+" "}o+="Z\" />";return o};ImageTracer.getRGBAbuckets=function(e,t){var r=new Array(e.height+2);for(var n=0;n<e.height+2;n++){r[n]=new Uint8Array((e.width+2)*4);for(var a=0;a<e.width+2;a++){r[n][a*4]=0;r[n][a*4+1]=0;r[n][a*4+2]=0;r[n][a*4+3]=0}}for(var o=0;o<e.height;o++){for(var i=0;i<e.width;i++){var c=(o*e.width+i)*4;var s=e.data[c],l=e.data[c+1],u=e.data[c+2],f=e.data[c+3];if(s+l+u<382&&f>128)r[o+1][(i+1)*4]=1}}return{width:e.width+2,height:e.height+2,buckets:r}};ImageTracer.hierarchicalEdgeDetection=function(e,t){var r=new Array(e.height);for(var n=0;n<e.height;n++){r[n]=new Uint8Array(e.width);for(var a=0;a<e.width;a++){r[n][a]=e.buckets[n][a*4]}}return[r]};ImageTracer.layersToTracedata=function(e,t){return{width:e[0][0].length,height:e[0].length,layers:[ImageTracer.tracelayer(e[0],t)]}};ImageTracer.tracelayer=function(e,t){var r=[];for(var n=0;n<e.length;n++){for(var a=0;a<e[0].length;a++){if(e[n][a]>0){r.push(ImageTracer.tracepath(e,n,a,t))}}}return r};ImageTracer.tracepath=function(e,t,r,n){var a=r,o=t,i=[],c=!1,s=0;while(!c){var l=0,u=0;if(e[o][a]>0){e[o][a]=0;if(e[o][a+1]>0){l=1}else if(e[o+1][a]>0){u=1}else if(e[o][a-1]>0){l=-1}else if(e[o-1][a]>0){u=-1}else{c=!0}}else{c=!0}if(!c){i.push({x1:a,y1:o,x2:a+l,y2:o+u});a+=l;o+=u}s++;if(s>1e5)c=!0}return{segments:i}};
+</script>
+
+<script>
+    /* LÓGICA DE INTERAÇÃO */
     const fInput = document.getElementById('fInput');
     const status = document.getElementById('status');
     const btnDown = document.getElementById('btn-down');
     const preview = document.getElementById('preview');
-    const visualImg = document.getElementById('visual-preview');
+    const visualImg = document.getElementById('visual-img');
     const canvas = document.getElementById('c');
     let svgStr = "";
 
-    window.onload = function() {
-        if(typeof ImageTracer !== 'undefined') {
-            status.innerText = "✅ Sistema pronto!";
-        } else {
-            status.innerText = "❌ Erro ao carregar motor. Recarregue.";
-        }
-    };
+    // Como a lib tá embutida, o motor já inicia pronto
+    status.innerText = "✅ Sistema pronto!";
 
     fInput.onchange = function(e) {
         const file = e.target.files[0];
@@ -64,40 +62,32 @@
             img.onload = function() {
                 const ctx = canvas.getContext('2d');
                 
-                // Limite de tamanho para não travar o navegador
-                const maxDim = 1200;
-                let w = img.width;
-                let h = img.height;
-                if(w > maxDim) { h = h * (maxDim / w); w = maxDim; }
+                // Redimensiona se for gigante (max 1000px)
+                const maxDim = 1000;
+                let w = img.width, h = img.height;
+                if(w > maxDim) { h *= (maxDim / w); w = maxDim; }
+                canvas.width = w; canvas.height = h;
 
-                canvas.width = w;
-                canvas.height = h;
-
-                // Desenha fundo branco sólido e a imagem por cima
+                // Força fundo branco e arte preta
                 ctx.fillStyle = "#FFFFFF";
                 ctx.fillRect(0, 0, w, h);
                 ctx.drawImage(img, 0, 0, w, h);
                 
-                // Mostra o preview para o usuário
                 visualImg.src = canvas.toDataURL("image/jpeg");
                 preview.style.display = 'flex';
-                status.innerText = "⚙️ Convertendo... aguarde.";
+                status.innerText = "⚙️ Gerando vetor...";
 
-                // Pequeno delay para o navegador processar o visual antes do cálculo pesado
                 setTimeout(function() {
                     try {
-                        // Transformamos o canvas em uma string de imagem JPG
-                        // Isso remove transparência e simplifica os dados para a lib
-                        const processedImg = canvas.toDataURL("image/jpeg", 0.8);
-                        
-                        ImageTracer.imageToSVG(processedImg, function(svg) {
+                        // Usa a biblioteca embutida
+                        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+                        ImageTracer.imageToSVG(dataUrl, function(svg) {
                             svgStr = svg;
                             btnDown.style.display = 'block';
-                            status.innerText = "✅ Concluído!";
-                        }, 'posterized2'); // 'posterized2' é o modo mais rápido para B&W
-
+                            status.innerText = "✅ Pronto!";
+                        }, { ltres:1, qtres:1, pathomit:15 });
                     } catch(err) {
-                        status.innerText = "❌ Falha no processamento.";
+                        status.innerText = "❌ Erro. Tente outra imagem.";
                         console.error(err);
                     }
                 }, 200);
@@ -108,12 +98,10 @@
     };
 
     btnDown.onclick = function() {
-        if(!svgStr) return;
         const blob = new Blob([svgStr], {type: 'image/svg+xml'});
-        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = 'coisoteca-arte.svg';
+        a.href = URL.createObjectURL(blob);
+        a.download = 'arte-coisoteca.svg';
         a.click();
     };
 </script>
