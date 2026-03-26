@@ -1,0 +1,18 @@
+// Dentro do seu <script> no index.html
+btnGenerate.addEventListener('click', async () => {
+    const userPrompt = promptInput.value;
+    loader.style.display = "block";
+
+    const response = await fetch('/api/gerar', { // Chama o arquivo acima
+        method: "POST",
+        body: JSON.stringify({ prompt: userPrompt })
+    });
+
+    const data = await response.json();
+    if (data.predictions) {
+        const imgData = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+        generatedImage.src = imgData;
+        previewArea.style.display = "block";
+    }
+    loader.style.display = "none";
+});
