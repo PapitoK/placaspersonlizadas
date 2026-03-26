@@ -47,21 +47,21 @@
   /* HEADER */
   .card-header {
     background: var(--charcoal);
-    padding: 28px 32px;
+    padding: 32px; /* Aumentado para dar respiro ao logo */
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centraliza o conteúdo do header */
+    text-align: center;
   }
-  .brand-tag {
-    font-family: 'DM Mono', monospace;
-    font-size: 9px;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--red);
-    background: rgba(210,59,64,0.12);
-    padding: 4px 10px;
-    border-radius: 4px;
-    display: inline-block;
-    margin-bottom: 12px;
+  
+  /* Estilização do Logo */
+  .brand-logo {
+    max-height: 40px; /* Define uma altura máxima segura */
+    width: auto;
+    display: block;
+    margin-bottom: 16px; /* Espaço até o título */
   }
+
   .card-header h1 {
     font-weight: 300;
     font-size: 26px;
@@ -138,188 +138,4 @@
 
 <div class="card">
   <div class="card-header">
-    <div class="brand-tag">Coisoteca Lab</div>
-    <h1>Validador de <span>Impressão</span></h1>
-    <p>25×5cm · 300 DPI · P&B · Traço ≥ 1mm</p>
-  </div>
-
-  <div class="card-body">
-    <div class="drop-zone" id="drop-zone">
-      <input type="file" id="file-input" accept="image/png,image/jpeg,application/pdf">
-      <div class="drop-label" id="drop-label">Arraste o arquivo ou clique aqui</div>
-      <div class="drop-sub">PNG, JPG ou PDF</div>
-    </div>
-
-    <ul class="check-list">
-      <li class="check-item" id="c-format"><div class="check-status"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div><strong>Formato</strong></li>
-      <li class="check-item" id="c-size"><div class="check-status"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div><strong>Dimensões (25x5cm)</strong></li>
-      <li class="check-item" id="c-color"><div class="check-status"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div><strong>Cores (P&B)</strong></li>
-      <li class="check-item" id="c-thick"><div class="check-status"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div><strong>Espessura (1mm)</strong></li>
-    </ul>
-
-    <div id="preview-section">
-      <div class="preview-frame">
-        <img id="preview-base">
-        <img id="preview-errors">
-      </div>
-      <p id="preview-msg" style="font-size: 10px; text-align: center; margin-top: 8px; font-weight: bold;"></p>
-    </div>
-
-    <button id="btn-download">Aguardando Validação...</button>
-  </div>
-</div>
-
-<canvas id="canvas"></canvas>
-
-<script>
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-  const TARGET_W = 2953;
-  const TARGET_H = 591;
-  const MIN_LINE_PX = 12;
-  const THRESHOLD = 200;
-
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-  const btnDownload = document.getElementById('btn-download');
-  const previewBase = document.getElementById('preview-base');
-  const previewErrors = document.getElementById('preview-errors');
-  const previewSection = document.getElementById('preview-section');
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-  // Drag & Drop
-  ['dragover', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
-  dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-  dropZone.addEventListener('drop', e => { dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
-  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
-
-  function setCheck(id, state) { document.getElementById(id).className = 'check-item ' + state; }
-
-  async function handleFile(file) {
-    if (!file) return;
-    document.getElementById('drop-label').textContent = file.name;
-    btnDownload.style.display = 'block';
-    btnDownload.className = '';
-    btnDownload.disabled = true;
-    btnDownload.textContent = "PROCESSANDO...";
-    
-    // CORREÇÃO JPG: Verifica se o tipo contém 'image' ou as extensões
-    const type = file.type.toLowerCase();
-    const isImage = type.includes('png') || type.includes('jpg') || type.includes('jpeg');
-    const isPDF = type === 'application/pdf';
-
-    if (!isImage && !isPDF) {
-      setCheck('c-format', 'fail');
-      btnDownload.textContent = "FORMATO INVÁLIDO";
-      return;
-    }
-    setCheck('c-format', 'ok');
-
-    let img = new Image();
-    if (isPDF) {
-      img = await pdfToImage(file);
-    } else {
-      img = await fileToImage(file);
-    }
-    processImage(img);
-  }
-
-  function fileToImage(file) {
-    return new Promise((res) => {
-      const reader = new FileReader();
-      reader.onload = e => { const i = new Image(); i.onload = () => res(i); i.src = e.target.result; };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function pdfToImage(file) {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: TARGET_W / page.getViewport({scale:1}).width });
-    const off = document.createElement('canvas');
-    off.width = viewport.width; off.height = viewport.height;
-    await page.render({ canvasContext: off.getContext('2d'), viewport }).promise;
-    const i = new Image();
-    return new Promise(res => { i.onload = () => res(i); i.src = off.toDataURL(); });
-  }
-
-  function processImage(img) {
-    if (Math.abs(img.width - TARGET_W) > 50) {
-      setCheck('c-size', 'fail');
-      btnDownload.textContent = "DIMENSÕES INCORRETAS";
-      return;
-    }
-    setCheck('c-size', 'ok');
-
-    canvas.width = TARGET_W; canvas.height = TARGET_H;
-    ctx.fillStyle = "white"; ctx.fillRect(0,0,TARGET_W, TARGET_H);
-    ctx.drawImage(img, 0, 0, TARGET_W, TARGET_H);
-
-    const imgData = ctx.getImageData(0,0,TARGET_W, TARGET_H);
-    const data = imgData.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const v = (data[i] + data[i+1] + data[i+2])/3 < THRESHOLD ? 0 : 255;
-      data[i] = data[i+1] = data[i+2] = v;
-    }
-    setCheck('c-color', 'ok');
-    ctx.putImageData(imgData, 0, 0);
-
-    // Scanner de Erros
-    const errCanvas = document.createElement('canvas');
-    errCanvas.width = TARGET_W; errCanvas.height = TARGET_H;
-    const eCtx = errCanvas.getContext('2d');
-    eCtx.fillStyle = "rgba(210, 59, 64, 0.9)";
-    let hasError = false;
-
-    for (let y = 0; y < TARGET_H; y += 2) {
-      let streak = 0;
-      for (let x = 0; x < TARGET_W; x++) {
-        if (data[(y * TARGET_W + x) * 4] === 0) streak++;
-        else {
-          if (streak > 0 && streak < MIN_LINE_PX) { eCtx.fillRect(x - streak, y - 5, streak, 10); hasError = true; }
-          streak = 0;
-        }
-      }
-    }
-    for (let x = 0; x < TARGET_W; x += 2) {
-      let streak = 0;
-      for (let y = 0; y < TARGET_H; y++) {
-        if (data[(y * TARGET_W + x) * 4] === 0) streak++;
-        else {
-          if (streak > 0 && streak < MIN_LINE_PX) { eCtx.fillRect(x - 5, y - streak, 10, streak); hasError = true; }
-          streak = 0;
-        }
-      }
-    }
-
-    previewBase.src = canvas.toDataURL();
-    previewErrors.src = errCanvas.toDataURL();
-    previewSection.style.display = 'block';
-
-    if (hasError) {
-      setCheck('c-thick', 'fail');
-      btnDownload.textContent = "CORRIJA OS ERROS PISCANTES";
-      btnDownload.classList.remove('ready');
-      btnDownload.disabled = true;
-    } else {
-      setCheck('c-thick', 'ok');
-      btnDownload.textContent = "BAIXAR ARQUIVO VALIDADO";
-      btnDownload.classList.add('ready');
-      btnDownload.disabled = false;
-    }
-  }
-
-  btnDownload.onclick = () => {
-    if (btnDownload.disabled) return;
-    const a = document.createElement('a');
-    a.download = 'coisoteca_valido.png';
-    a.href = canvas.toDataURL();
-    a.click();
-  }
-</script>
-</body>
-</html>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABPCAYAAAC7OsqGAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAViSURBVHhe7ZtPaFxFFMffm91kE7vJNpvtJrYatYlaK6IVS4t4kIAVQS8iHryIF0U9iXgQD4p4EPGgFw/iSTwIehHxIB4EVREvIh5EPEjAqi1asbXJbrKb7L43OzM749vZZZPJZreTzG4n+T34Yv5kMzv5Zef9Zt7MvO8YV4wxdR94YI5V474v98L4I9bYmYlV1q5X7YXxl/Uv64wxdY9927bK5g6U9cM7Zf0vY0xdY98B4M4Z5SNo8z6lfARt3qeUj6DN+5TyEbR5n1I+gjbvU8pH0OZ9SvkI2rxPKR9Bm/cp5SNo8z6lfARt3qeUj6DN+5TyEbR5n1I+gjbvU8pH0OZ9SvkI2rxPKR9Bm/cp5SNo8z6lfARt3qeUj6DN+5TyEbR5n1I+gjbvU8pH0OZ9SvkI2rxPKR9Bm/cp5SNo8z6lfARt3qeUj6DN+5TyEbR5n1I+gjbvU8pH0OZ9SvkI2rxPKR9Bm/cp5SNo8
