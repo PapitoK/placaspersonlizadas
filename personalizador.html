@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 10px; background: white; text-align: center; }
+        .box { border: 1px solid #eee; border-radius: 12px; padding: 15px; }
+        .upload { border: 2px dashed #D23B40; padding: 20px; border-radius: 10px; background: #fffcfc; cursor: pointer; position: relative; }
+        .upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+        .preview-slot { width: 100%; aspect-ratio: 5/1; background: #e8e4e0; border-radius: 100px; margin: 15px 0; display: none; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ccc;}
+        .btn { display: none; width: 100%; padding: 12px; background: #231F20; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .status { font-size: 12px; margin-top: 10px; padding: 5px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="upload">
+            <input type="file" id="f" accept="image/*">
+            <span style="color:#D23B40; font-weight:bold;">Clique aqui para enviar sua arte</span>
+        </div>
+        <div id="ps" class="preview-slot"><canvas id="c" style="max-height:80%; max-width:90%;"></canvas></div>
+        <div id="st" class="status"></div>
+        <button id="btn" class="btn">Baixar SVG para Impressão</button>
+    </div>
+
+    <script>
+        const f = document.getElementById('f'), ps = document.getElementById('ps'), c = document.getElementById('c'), st = document.getElementById('st'), btn = document.getElementById('btn');
+        let svgOut = "";
+
+        f.onchange = e => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const img = new Image();
+                img.onload = () => {
+                    const ctx = c.getContext('2d');
+                    c.width = img.width; c.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    ps.style.display = 'flex';
+                    
+                    if(img.width < 1000) {
+                        st.innerHTML = "⚠️ Resolução baixa para traços de 1mm.";
+                        st.style.background = "#fff3d6";
+                    } else {
+                        st.innerHTML = "✅ Qualidade excelente!";
+                        st.style.background = "#e8f5ee";
+                    }
+
+                    ImageTracer.imageToSVG(ev.target.result, s => {
+                        svgOut = s;
+                        btn.style.display = 'block';
+                    }, { ltres:1, qtres:1, numberofcolors:2 });
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        btn.onclick = () => {
+            const blob = new Blob([svgOut], {type: 'image/svg+xml'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'arte-pilula.svg';
+            a.click();
+        };
+    </script>
+</body>
+</html>
