@@ -1,113 +1,4 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Validador Coisoteca | Detecção de Erros</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <style>
-        :root { --red: #D23B40; --green: #28a745; --cream: #FAF8F5; --charcoal: #231F20; }
-        body { font-family: sans-serif; background: var(--cream); padding: 20px; text-align: center; }
-        .box { background: white; max-width: 550px; margin: auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        
-        .upload-area { border: 2px dashed #ccc; padding: 30px; border-radius: 15px; cursor: pointer; position: relative; background: #fff; transition: 0.3s; margin-bottom: 20px; }
-        .upload-area.dragover { border-color: var(--red); background: #FFF5F5; }
-        input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-
-        .check-list { text-align: left; margin: 20px 0; padding: 0; list-style: none; }
-        .check-item { padding: 12px; margin-bottom: 8px; border-radius: 8px; background: #f9f9f9; display: flex; align-items: center; font-size: 14px; border: 1px solid #eee; }
-        .check-item b { margin-right: 15px; font-size: 18px; width: 20px; text-align: center; }
-        .pending { color: #999; }
-        .ok { background: #eeffee; border-color: #ccffcc; color: var(--green); }
-        .fail { background: #ffeeee; border-color: #ffcccc; color: var(--red); }
-
-        /* Preview Clean (Sem borda preta) */
-        #preview-container { 
-            width: 100%; margin: 20px 0; display: none; 
-            flex-direction: column; align-items: center; 
-        }
-        #preview-img { 
-            width: 100%; border-radius: 8px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-            border: 1px solid #ddd;
-        }
-        .preview-label { font-size: 11px; color: #888; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
-
-        #btn-down { background: var(--charcoal); color: white; padding: 18px; width: 100%; border-radius: 12px; cursor: pointer; display: none; border: none; font-weight: bold; font-size: 16px; }
-        canvas { display: none; }
-    </style>
-</head>
-<body>
-
-<div class="box">
-    <div style="background:var(--red); color:white; font-size:10px; padding:4px 10px; border-radius:4px; margin-bottom:10px; font-weight:bold; display:inline-block;">COISOTECA LAB</div>
-    <h2>Validador de Impressão</h2>
-    
-    <div class="upload-area" id="drop-zone">
-        <input type="file" id="fInput" accept="image/*, application/pdf">
-        <strong>Arraste o arquivo ou clique aqui</strong>
-    </div>
-
-    <ul class="check-list">
-        <li class="check-item pending" id="c-format"><b>○</b> Formato</li>
-        <li class="check-item pending" id="c-size"><b>○</b> Dimensões (25x5cm)</li>
-        <li class="check-item pending" id="c-color"><b>○</b> Conversão P&B</li>
-        <li class="check-item pending" id="c-thick"><b>○</b> Espessura Mínima (1.0mm)</li>
-    </ul>
-
-    <div id="preview-container">
-        <img id="preview-img">
-        <div class="preview-label" id="preview-msg">Pré-visualização do resultado</div>
-    </div>
-
-    <button id="btn-down">BAIXAR PNG PARA IMPRESSÃO</button>
-    <canvas id="c"></canvas>
-</div>
-
-<script>
-    const dropZone = document.getElementById('drop-zone');
-    const fInput = document.getElementById('fInput');
-    const btnDown = document.getElementById('btn-down');
-    const previewImg = document.getElementById('preview-img');
-    const previewContainer = document.getElementById('preview-container');
-    const previewMsg = document.getElementById('preview-msg');
-    const canvas = document.getElementById('c');
-    const ctx = canvas.getContext('2d');
-
-    const TARGET_W = 2953; 
-    const TARGET_H = 591;
-    const MIN_LINE_PX = 12;
-
-    // Drag and Drop
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(n => dropZone.addEventListener(n, e => {e.preventDefault(); e.stopPropagation();}));
-    dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-    dropZone.addEventListener('drop', e => { dropZone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
-    fInput.onchange = e => handleFile(e.target.files[0]);
-
-    function updateCheck(id, status, text) {
-        const el = document.getElementById(id);
-        const icons = { pending: '○', ok: '✅', fail: '❌' };
-        el.className = 'check-item ' + status;
-        el.innerHTML = `<b>${icons[status]}</b> ${text}`;
-    }
-
-    async function handleFile(file) {
-        if (!file) return;
-        btnDown.style.display = 'none';
-        previewContainer.style.display = 'none';
-        updateCheck('c-format', 'ok', 'Formato aceito');
-
-        const reader = new FileReader();
-        reader.onload = ev => {
-            const img = new Image();
-            img.onload = () => processAll(img);
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
-    }
-
-    function processAll(img) {
+function processAll(img) {
         if (Math.abs(img.width - TARGET_W) > 100) {
             updateCheck('c-size', 'fail', `Tamanho errado: ${img.width}px`);
             return;
@@ -129,55 +20,68 @@
         }
         updateCheck('c-color', 'ok', 'Cores OK');
 
-        // 2. Criar Canvas de Erros (Preview)
+        // 2. Criar Canvas de Preview para desenhar os erros
         let errorCanvas = document.createElement('canvas');
         errorCanvas.width = TARGET_W; errorCanvas.height = TARGET_H;
         let eCtx = errorCanvas.getContext('2d');
-        eCtx.putImageData(imgData, 0, 0);
+        eCtx.putImageData(imgData, 0, 0); // Começa com a imagem P&B limpa
+        eCtx.fillStyle = "rgba(210, 59, 64, 0.8)"; // Vermelho Coisoteca com leve transparência
 
-        // 3. Scanner de Espessura e Marcação de Erros
-        let hasThinLines = false;
-        eCtx.fillStyle = "red";
+        let errorCount = 0;
 
-        for (let y = 0; y < TARGET_H; y += 2) {
+        // 3. SCANNER HORIZONTAL (Detecta linhas verticais finas)
+        for (let y = 0; y < TARGET_H; y += 3) { // Salto de 3px para não pesar tanto, mas ler tudo
             let streak = 0;
             for (let x = 0; x < TARGET_W; x++) {
-                if (data[(y * TARGET_W + x) * 4] === 0) streak++;
-                else {
+                if (data[(y * TARGET_W + x) * 4] === 0) {
+                    streak++;
+                } else {
                     if (streak > 0 && streak < MIN_LINE_PX) {
-                        hasThinLines = true;
-                        // Pinta a linha problemática de vermelho no preview
-                        eCtx.fillRect(x - streak, y - 2, streak, 5); 
+                        // Marca o erro no canvas de preview
+                        eCtx.fillRect(x - streak, y - 5, streak, 10); 
+                        errorCount++;
                     }
                     streak = 0;
                 }
             }
         }
 
-        if (hasThinLines) {
-            updateCheck('c-thick', 'fail', 'Traços < 1mm detectados');
-            previewMsg.innerText = "⚠️ Erros destacados em vermelho";
+        // 4. SCANNER VERTICAL (Detecta linhas horizontais finas)
+        for (let x = 0; x < TARGET_W; x += 10) { 
+            let streak = 0;
+            for (let y = 0; y < TARGET_H; y++) {
+                if (data[(y * TARGET_W + x) * 4] === 0) {
+                    streak++;
+                } else {
+                    if (streak > 0 && streak < MIN_LINE_PX) {
+                        eCtx.fillRect(x - 5, y - streak, 10, streak);
+                        errorCount++;
+                    }
+                    streak = 0;
+                }
+            }
+        }
+
+        if (errorCount > 0) {
+            updateCheck('c-thick', 'fail', `${errorCount} pontos críticos detectados (<1mm)`);
+            previewMsg.innerText = "⚠️ Corrija os pontos vermelhos para imprimir";
             previewMsg.style.color = "var(--red)";
         } else {
-            updateCheck('c-thick', 'ok', 'Espessura aprovada');
-            previewMsg.innerText = "✅ Arte pronta para impressão";
+            updateCheck('c-thick', 'ok', 'Espessura aprovada em toda a arte');
+            previewMsg.innerText = "✅ Arte perfeita para impressão";
             previewMsg.style.color = "var(--green)";
         }
 
-        // Preview mostra os erros, mas o Download é o P&B puro
+        // Atualiza Preview e Botão
         previewImg.src = errorCanvas.toDataURL("image/png");
         previewContainer.style.display = 'flex';
         btnDown.style.display = 'block';
 
-        // Salva a versão limpa (P&B) para o download
         btnDown.onclick = () => {
-            ctx.putImageData(imgData, 0, 0); // Garante que o download não tenha as marcas vermelhas
+            ctx.putImageData(imgData, 0, 0); // Download sempre limpo
             const link = document.createElement('a');
-            link.download = 'coisoteca_pronto.png';
+            link.download = 'placa_coisoteca.png';
             link.href = canvas.toDataURL("image/png");
             link.click();
         };
     }
-</script>
-</body>
-</html>
