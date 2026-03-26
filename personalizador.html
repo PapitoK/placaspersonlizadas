@@ -1,10 +1,171 @@
-function processAll(img) {
-        if (Math.abs(img.width - TARGET_W) > 100) {
-            updateCheck('c-size', 'fail', `Tamanho errado: ${img.width}px`);
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validador Técnico | Coisoteca</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        :root { --red: #D23B40; --green: #28a745; --cream: #FAF8F5; --charcoal: #231F20; }
+        body { font-family: sans-serif; background: var(--cream); padding: 20px; text-align: center; color: var(--charcoal); }
+        .box { background: white; max-width: 550px; margin: auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        
+        /* Área de Upload */
+        .upload-area { 
+            border: 2px dashed #ccc; padding: 30px; border-radius: 15px; 
+            cursor: pointer; position: relative; background: #fff; 
+            transition: all 0.3s; margin-bottom: 20px; 
+        }
+        .upload-area.dragover { border-color: var(--red); background: #FFF5F5; transform: scale(1.01); }
+        input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+        /* Lista de Checagem */
+        .check-list { text-align: left; margin: 20px 0; padding: 0; list-style: none; }
+        .check-item { 
+            padding: 12px; margin-bottom: 8px; border-radius: 8px; 
+            background: #f9f9f9; display: flex; align-items: center; 
+            font-size: 14px; border: 1px solid #eee; transition: 0.3s;
+        }
+        .check-item b { margin-right: 15px; font-size: 18px; width: 20px; text-align: center; }
+        .pending { color: #999; }
+        .ok { background: #eeffee; border-color: #ccffcc; color: var(--green); }
+        .fail { background: #ffeeee; border-color: #ffcccc; color: var(--red); }
+
+        /* Preview */
+        #preview-container { 
+            width: 100%; margin: 20px 0; display: none; 
+            flex-direction: column; align-items: center; 
+        }
+        #preview-img { 
+            width: 100%; border-radius: 8px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            border: 1px solid #ddd; background: white;
+        }
+        .preview-label { font-size: 11px; color: #888; margin-top: 8px; font-weight: bold; }
+
+        #btn-down { 
+            background: var(--charcoal); color: white; padding: 18px; 
+            width: 100%; border-radius: 12px; cursor: pointer; 
+            display: none; border: none; font-weight: bold; font-size: 16px; 
+        }
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <div style="background:var(--red); color:white; font-size:10px; padding:4px 10px; border-radius:4px; margin-bottom:10px; font-weight:bold; display:inline-block;">COISOTECA LAB</div>
+    <h2 style="margin-top:0;">Validador de Impressão</h2>
+    
+    <div class="upload-area" id="drop-zone">
+        <input type="file" id="fInput" accept="image/*, application/pdf">
+        <strong id="upload-label">Arraste a arte ou clique aqui</strong>
+    </div>
+
+    <ul class="check-list">
+        <li class="check-item pending" id="c-format"><b>○</b> Formato (PDF, PNG ou JPG)</li>
+        <li class="check-item pending" id="c-size"><b>○</b> Dimensões (25x5cm / 300 DPI)</li>
+        <li class="check-item pending" id="c-color"><b>○</b> Cores (Conversão P&B)</li>
+        <li class="check-item pending" id="c-thick"><b>○</b> Espessura Mínima (1.0mm)</li>
+    </ul>
+
+    <div id="preview-container">
+        <img id="preview-img">
+        <div class="preview-label" id="preview-msg">PRÉ-VISUALIZAÇÃO</div>
+    </div>
+
+    <button id="btn-down">BAIXAR ARQUIVO PARA IMPRESSÃO</button>
+    
+    <canvas id="c"></canvas>
+</div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fInput = document.getElementById('fInput');
+    const btnDown = document.getElementById('btn-down');
+    const previewImg = document.getElementById('preview-img');
+    const previewContainer = document.getElementById('preview-container');
+    const previewMsg = document.getElementById('preview-msg');
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+
+    const TARGET_W = 2953; // 25cm em 300 DPI
+    const TARGET_H = 591;  // 5cm em 300 DPI
+    const MIN_LINE_PX = 12; // 1.0mm aproximadamente
+
+    // --- EVENTOS DRAG & DROP ---
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(n => {
+        dropZone.addEventListener(n, e => { e.preventDefault(); e.stopPropagation(); });
+    });
+
+    dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => {
+        dropZone.classList.remove('dragover');
+        handleFile(e.dataTransfer.files[0]);
+    });
+
+    fInput.onchange = e => handleFile(e.target.files[0]);
+
+    function updateCheck(id, status, text) {
+        const el = document.getElementById(id);
+        const icons = { pending: '○', ok: '✅', fail: '❌' };
+        el.className = 'check-item ' + status;
+        el.innerHTML = `<b>${icons[status]}</b> ${text}`;
+    }
+
+    async function handleFile(file) {
+        if (!file) return;
+
+        // Reset
+        btnDown.style.display = 'none';
+        previewContainer.style.display = 'none';
+        updateCheck('c-format', 'pending', 'Formato (PDF, PNG ou JPG)');
+        updateCheck('c-size', 'pending', 'Dimensões (25x5cm / 300 DPI)');
+        updateCheck('c-color', 'pending', 'Cores (Conversão P&B)');
+        updateCheck('c-thick', 'pending', 'Espessura Mínima (1.0mm)');
+
+        // 1. Validar Formato
+        if (["image/png", "image/jpeg", "application/pdf"].includes(file.type)) {
+            updateCheck('c-format', 'ok', 'Formato aceito');
+        } else {
+            updateCheck('c-format', 'fail', 'Formato inválido! Use PDF, PNG ou JPG');
             return;
         }
-        updateCheck('c-size', 'ok', 'Tamanho OK (25x5cm)');
 
+        // Leitura (PDF ou Imagem)
+        if (file.type === "application/pdf") {
+            const pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale: 4 });
+            canvas.width = viewport.width; canvas.height = viewport.height;
+            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            const img = new Image();
+            img.onload = () => processAll(img);
+            img.src = canvas.toDataURL();
+        } else {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const img = new Image();
+                img.onload = () => processAll(img);
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function processAll(img) {
+        // 2. Validar Tamanho
+        if (Math.abs(img.width - TARGET_W) > 100 || Math.abs(img.height - TARGET_H) > 100) {
+            updateCheck('c-size', 'fail', `Tamanho incorreto: ${img.width}x${img.height}px (Requer 2953x591px)`);
+            return;
+        }
+        updateCheck('c-size', 'ok', 'Dimensões OK (25x5cm)');
+
+        // Preparar Canvas de Processamento
         canvas.width = TARGET_W; canvas.height = TARGET_H;
         ctx.fillStyle = "white"; ctx.fillRect(0, 0, TARGET_W, TARGET_H);
         ctx.drawImage(img, 0, 0, TARGET_W, TARGET_H);
@@ -12,79 +173,77 @@ function processAll(img) {
         let imgData = ctx.getImageData(0, 0, TARGET_W, TARGET_H);
         let data = imgData.data;
 
-        // 1. Converter para P&B Puro
+        // 3. Converter para P&B Puro (Limiar 200 para sensibilidade alta)
         for (let i = 0; i < data.length; i += 4) {
             let avg = (data[i] + data[i+1] + data[i+2]) / 3;
             let v = avg < 200 ? 0 : 255;
             data[i] = data[i+1] = data[i+2] = v;
         }
-        updateCheck('c-color', 'ok', 'Cores OK');
+        updateCheck('c-color', 'ok', 'Cores convertidas para P&B');
 
-        // 2. Canvas de Preview
+        // 4. Scanner de Precisão e Mapa de Erros
         let errorCanvas = document.createElement('canvas');
         errorCanvas.width = TARGET_W; errorCanvas.height = TARGET_H;
         let eCtx = errorCanvas.getContext('2d');
-        eCtx.putImageData(imgData, 0, 0);
-        eCtx.fillStyle = "rgba(210, 59, 64, 0.9)"; // Vermelho mais opaco
+        eCtx.putImageData(imgData, 0, 0); 
+        eCtx.fillStyle = "rgba(210, 59, 64, 0.9)"; // Vermelho vibrante
 
-        let hasError = false;
-        let errorCount = 0;
+        let errorFound = false;
 
-        // 3. SCANNER HORIZONTAL (Detecta larguras finas - Ex: Pontos, Linhas Verticais)
-        for (let y = 0; y < TARGET_H; y += 2) { 
+        // Scanner Horizontal (Largura de traços)
+        for (let y = 0; y < TARGET_H; y += 2) {
             let streak = 0;
             for (let x = 0; x < TARGET_W; x++) {
-                if (data[(y * TARGET_W + x) * 4] === 0) {
-                    streak++;
-                } else {
+                if (data[(y * TARGET_W + x) * 4] === 0) streak++;
+                else {
                     if (streak > 0 && streak < MIN_LINE_PX) {
                         eCtx.fillRect(x - streak, y - 4, streak, 8);
-                        errorCount++;
-                        hasError = true;
+                        errorFound = true;
                     }
                     streak = 0;
                 }
             }
         }
 
-        // 4. SCANNER VERTICAL (Detecta alturas finas - Ex: A sua linha comprida horizontal)
-        // Agora ele varre pixel por pixel lateralmente também
-        for (let x = 0; x < TARGET_W; x += 2) { 
+        // Scanner Vertical (Altura de traços - pega linhas horizontais finas)
+        for (let x = 0; x < TARGET_W; x += 2) {
             let streak = 0;
             for (let y = 0; y < TARGET_H; y++) {
-                if (data[(y * TARGET_W + x) * 4] === 0) {
-                    streak++;
-                } else {
+                if (data[(y * TARGET_W + x) * 4] === 0) streak++;
+                else {
                     if (streak > 0 && streak < MIN_LINE_PX) {
-                        // Marca o erro da linha horizontal fina
                         eCtx.fillRect(x - 4, y - streak, 8, streak);
-                        errorCount++;
-                        hasError = true;
+                        errorFound = true;
                     }
                     streak = 0;
                 }
             }
         }
 
-        if (hasError) {
-            updateCheck('c-thick', 'fail', `Erros detectados: ajuste os traços vermelhos.`);
-            previewMsg.innerText = "⚠️ Linhas finas detectadas (vermelho)";
+        if (errorFound) {
+            updateCheck('c-thick', 'fail', 'Traços menores que 1mm detectados');
+            previewMsg.innerText = "⚠️ PONTOS VERMELHOS SÃO MUITO FINOS";
             previewMsg.style.color = "var(--red)";
         } else {
-            updateCheck('c-thick', 'ok', 'Espessura aprovada!');
-            previewMsg.innerText = "✅ Arte pronta para impressão";
+            updateCheck('c-thick', 'ok', 'Espessura aprovada para impressão');
+            previewMsg.innerText = "✅ ARTE VALIDADA";
             previewMsg.style.color = "var(--green)";
         }
 
+        // Mostrar Preview com Erros e liberar Download P&B
         previewImg.src = errorCanvas.toDataURL("image/png");
         previewContainer.style.display = 'flex';
         btnDown.style.display = 'block';
 
         btnDown.onclick = () => {
+            // O download usa o ctx original (apenas P&B, sem o vermelho)
             ctx.putImageData(imgData, 0, 0);
             const link = document.createElement('a');
-            link.download = 'placa_coisoteca.png';
+            link.download = 'placa_coisoteca_pronta.png';
             link.href = canvas.toDataURL("image/png");
             link.click();
         };
     }
+</script>
+</body>
+</html>
