@@ -3,20 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coisoteca | Validador 1mm</title>
+    <title>Validador Técnico Coisoteca</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <style>
-        :root { --red: #D23B40; --cream: #FAF8F5; --charcoal: #231F20; }
-        body { font-family: sans-serif; background: var(--cream); text-align: center; padding: 20px; }
-        .box { background: white; max-width: 500px; margin: auto; padding: 30px; border-radius: 20px; border: 1px solid #ddd; }
-        .upload-area { border: 2px dashed #ccc; padding: 30px; border-radius: 15px; cursor: pointer; position: relative; }
+        :root { --red: #D23B40; --green: #28a745; --cream: #FAF8F5; --charcoal: #231F20; }
+        body { font-family: sans-serif; background: var(--cream); padding: 20px; color: var(--charcoal); }
+        .box { background: white; max-width: 550px; margin: auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        
+        /* Lista de Validação */
+        .validation-list { text-align: left; background: #f8f9fa; border-radius: 12px; padding: 20px; margin: 20px 0; border: 1px solid #eee; }
+        .v-item { display: flex; align-items: center; margin-bottom: 10px; font-size: 14px; color: #666; }
+        .v-item b { margin-right: 10px; font-size: 18px; }
+        .pending { color: #ccc; }
+        .success { color: var(--green); font-weight: bold; }
+        .error { color: var(--red); font-weight: bold; }
+        .warning { color: #856404; font-weight: bold; }
+
+        .upload-area { border: 2px dashed #ccc; padding: 40px; border-radius: 15px; cursor: pointer; position: relative; background: #fff; transition: 0.3s; }
+        .upload-area:hover { border-color: var(--red); }
+        input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
         #preview-container { width: 100%; aspect-ratio: 5/1; background: #eee; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ddd; }
         #preview-img { max-width: 90%; max-height: 80%; }
-        .progress-container { width: 100%; background: #eee; height: 10px; border-radius: 10px; margin: 20px 0; display: none; }
-        .progress-bar { width: 0%; height: 100%; background: var(--red); transition: 0.3s; }
-        #status { font-weight: bold; margin: 15px 0; font-size: 14px; }
-        #warning-log { font-size: 12px; color: #856404; background: #fff3cd; border-radius: 8px; padding: 10px; display: none; margin-bottom: 10px; text-align: left; }
-        #btn-down { background: var(--charcoal); color: white; padding: 18px; width: 100%; border-radius: 12px; cursor: pointer; display: none; border: none; font-weight: bold; }
+        
+        #btn-down { background: var(--charcoal); color: white; padding: 18px; width: 100%; border-radius: 12px; cursor: pointer; display: none; border: none; font-weight: bold; font-size: 16px; }
         canvas { display: none; }
     </style>
 </head>
@@ -24,50 +34,62 @@
 
 <div class="box">
     <div style="background:var(--red); color:white; font-size:10px; padding:4px 10px; display:inline-block; border-radius:4px; margin-bottom:10px; font-weight:bold;">COISOTECA</div>
-    <h2>Validador de Impressão</h2>
-    <p style="font-size:12px; color:#666;">Aviso: traços menores que <b>1mm</b> podem não ser impressos corretamente.</p>
-
-    <div class="upload-area" id="drop-zone">
+    <h2>Validador de Arquivo</h2>
+    
+    <div class="upload-area">
         <input type="file" id="fInput" accept="image/*, application/pdf">
-        <strong>Subir arte (25x5cm)</strong>
+        <strong>Arraste ou selecione o arquivo</strong>
+    </div>
+
+    <div class="validation-list" id="v-list">
+        <div class="v-item pending" id="v-format"><b>○</b> Formato de arquivo (PDF/PNG/JPG)</div>
+        <div class="v-item pending" id="v-size"><b>○</b> Dimensões exatas (25x5cm / 300 DPI)</div>
+        <div class="v-item pending" id="v-color"><b>○</b> Conversão Preto e Branco (Limiar)</div>
+        <div class="v-item pending" id="v-thickness"><b>○</b> Espessura mínima de traço (1.0mm)</div>
     </div>
 
     <div id="preview-container"><img id="preview-img"></div>
-    <div class="progress-container" id="p-cont"><div class="progress-bar" id="p-bar"></div></div>
-    
-    <div id="status">Aguardando arquivo...</div>
-    <div id="warning-log"></div>
-
-    <button id="btn-down">BAIXAR ARQUIVO VALIDADO</button>
+    <button id="btn-down">BAIXAR ARQUIVO PARA IMPRESSÃO</button>
     <canvas id="c"></canvas>
 </div>
 
 <script>
     const fInput = document.getElementById('fInput');
-    const status = document.getElementById('status');
-    const warningLog = document.getElementById('warning-log');
-    const pBar = document.getElementById('p-bar');
-    const pCont = document.getElementById('p-cont');
     const btnDown = document.getElementById('btn-down');
-    const previewContainer = document.getElementById('preview-container');
     const previewImg = document.getElementById('preview-img');
+    const previewContainer = document.getElementById('preview-container');
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
 
-    const TARGET_W = 2953; // 25cm @ 300dpi
-    const TARGET_H = 591;  // 5cm @ 300dpi
-    const MIN_LINE_PX = 11; // Aprox 1mm (12px é 1.01mm)
+    const TARGET_W = 2953; 
+    const TARGET_H = 591;
+    const MIN_LINE_PX = 11.5; // Aproximadamente 1mm
+
+    function setStatus(id, type, text) {
+        const el = document.getElementById(id);
+        const icons = { pending: '○', success: '✅', error: '❌', warning: '⚠️' };
+        el.className = 'v-item ' + type;
+        el.innerHTML = `<b>${icons[type]}</b> ${text}`;
+    }
 
     fInput.onchange = (e) => handleFile(e.target.files[0]);
 
     async function handleFile(file) {
         if (!file) return;
-        btnDown.style.display = 'none';
-        warningLog.style.display = 'none';
-        pCont.style.display = 'block';
-        updateUI("Processando...", 20, "var(--charcoal)");
 
-        // Lógica de leitura (PDF ou Imagem) idêntica à anterior...
+        // Reset
+        btnDown.style.display = 'none';
+        previewContainer.style.display = 'none';
+        ['v-format','v-size','v-color','v-thickness'].forEach(id => setStatus(id, 'pending', document.getElementById(id).innerText.substring(2)));
+
+        // 1. Validar Formato
+        if (["image/png", "image/jpeg", "application/pdf"].includes(file.type)) {
+            setStatus('v-format', 'success', 'Formato suportado');
+        } else {
+            setStatus('v-format', 'error', 'Formato não aceito (Use PDF/PNG/JPG)');
+            return;
+        }
+
         if (file.type === "application/pdf") {
             const pdfjsLib = window['pdfjs-dist/build/pdf'];
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
@@ -78,78 +100,76 @@
             canvas.width = viewport.width; canvas.height = viewport.height;
             await page.render({ canvasContext: ctx, viewport: viewport }).promise;
             const img = new Image();
-            img.onload = () => validateAndProcess(img);
+            img.onload = () => validateAll(img);
             img.src = canvas.toDataURL();
         } else {
             const reader = new FileReader();
             reader.onload = (ev) => {
                 const img = new Image();
-                img.onload = () => validateAndProcess(img);
+                img.onload = () => validateAll(img);
                 img.src = ev.target.result;
             };
             reader.readAsDataURL(file);
         }
     }
 
-    function updateUI(msg, percent, color) {
-        status.innerText = msg;
-        status.style.color = color;
-        pBar.style.width = percent + '%';
-    }
-
-    function validateAndProcess(img) {
-        if (Math.abs(img.width - TARGET_W) > 150) {
-            updateUI("❌ Tamanho errado. Use 25x5cm em 300DPI.", 100, "red");
+    function validateAll(img) {
+        // 2. Validar Tamanho
+        const diffW = Math.abs(img.width - TARGET_W);
+        const diffH = Math.abs(img.height - TARGET_H);
+        
+        if (diffW < 150 && diffH < 150) {
+            setStatus('v-size', 'success', `Tamanho correto: 25x5cm (${img.width}px)`);
+        } else {
+            setStatus('v-size', 'error', `Tamanho incorreto: ${img.width}x${img.height}px. Ajuste para 2953x591px.`);
             return;
         }
 
+        // 3. Processar P&B
         canvas.width = TARGET_W; canvas.height = TARGET_H;
         ctx.fillStyle = "white"; ctx.fillRect(0, 0, TARGET_W, TARGET_H);
         ctx.drawImage(img, 0, 0, TARGET_W, TARGET_H);
 
         const imgData = ctx.getImageData(0, 0, TARGET_W, TARGET_H);
         const data = imgData.data;
-        
-        // 1. Aplicar Threshold (Preto e Branco) e Limpar Template Cinza
         for (let i = 0; i < data.length; i += 4) {
             const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            const v = avg < 120 ? 0 : 255;
+            const v = avg < 110 ? 0 : 255; // Threshold
             data[i] = data[i+1] = data[i+2] = v;
         }
+        ctx.putImageData(imgData, 0, 0);
+        setStatus('v-color', 'success', 'Conversão P&B aplicada (Template removido)');
 
-        // 2. CHECAGEM DE ESPESSURA (Amostragem Horizontal)
-        let thinPoints = 0;
-        for (let y = 0; y < TARGET_H; y += 10) { // Pula linhas para performance
-            let rowCount = 0;
+        // 4. Validar Espessura (1mm)
+        let thinFound = false;
+        // Amostragem em grade para detectar linhas finas
+        for (let y = 10; y < TARGET_H; y += 20) {
+            let count = 0;
             for (let x = 0; x < TARGET_W; x++) {
                 const idx = (y * TARGET_W + x) * 4;
-                if (data[idx] === 0) {
-                    rowCount++;
-                } else {
-                    if (rowCount > 0 && rowCount < MIN_LINE_PX) thinPoints++;
-                    rowCount = 0;
+                if (data[idx] === 0) count++;
+                else {
+                    if (count > 0 && count < MIN_LINE_PX) thinFound = true;
+                    count = 0;
                 }
             }
         }
 
-        ctx.putImageData(imgData, 0, 0);
+        if (!thinFound) {
+            setStatus('v-thickness', 'success', 'Espessura de traço segura (>1mm)');
+        } else {
+            setStatus('v-thickness', 'warning', 'Atenção: Traços menores que 1mm detectados.');
+        }
+
+        // Finalizar
         previewImg.src = canvas.toDataURL("image/png");
         previewContainer.style.display = 'flex';
-
-        if (thinPoints > 30) { // Tolerância de ruído
-            warningLog.innerHTML = "⚠️ <b>Atenção:</b> Detectamos traços muito finos (menores que 1mm). Eles podem não aparecer na impressão 3D.";
-            warningLog.style.display = 'block';
-            updateUI("⚠️ Analisado com ressalvas", 100, "#856404");
-        } else {
-            updateUI("✅ Perfeito para impressão!", 100, "green");
-        }
-        
         btnDown.style.display = 'block';
     }
 
     btnDown.onclick = () => {
         const link = document.createElement('a');
-        link.download = 'placa-validada-coisoteca.png';
+        link.download = 'arte-finalizada-coisoteca.png';
         link.href = canvas.toDataURL("image/png");
         link.click();
     };
