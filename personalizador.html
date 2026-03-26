@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personalizador Pílula — Coisoteca</title>
-    
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
-    
     <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer.min.js"></script>
 
     <style>
@@ -15,14 +13,37 @@
         .card { background: #fff; width: 100%; max-width: 480px; padding: 35px; border-radius: 20px; border: 1px solid rgba(0,0,0,0.1); text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
         .brand { background: var(--red); color: white; font-size: 10px; font-weight: 700; padding: 4px 12px; border-radius: 3px; display: inline-block; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
         h1 { font-family: 'Syne', sans-serif; font-size: 26px; margin: 0 0 25px 0; color: var(--charcoal); }
-        .upload-zone { border: 2px dashed var(--red); border-radius: 12px; padding: 40px 20px; cursor: pointer; position: relative; background: #fff; transition: 0.3s; }
-        .upload-zone:hover { background: #FFF9F9; }
-        .upload-zone input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        
+        /* Área de clique aumentada e forçada */
+        .upload-wrapper {
+            position: relative;
+            width: 100%;
+            height: 120px;
+            border: 2px dashed var(--red);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            transition: 0.3s;
+            overflow: hidden;
+        }
+        .upload-wrapper:hover { background: #FFF9F9; }
+        
+        #fInput {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
+        }
+
         .preview-area { display: none; margin-top: 30px; }
         .slot { width: 100%; aspect-ratio: 5/1; background: #E8E4E0; border-radius: 100px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 20px; border: 1px solid #ddd; }
         canvas { max-width: 85%; max-height: 75%; filter: grayscale(1) contrast(150%); }
         .btn-main { background: var(--red); color: white; border: none; padding: 18px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; display: none; }
-        #log { font-size: 12px; color: #999; margin-top: 10px; }
+        #log { font-size: 12px; color: #666; margin-top: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -31,18 +52,18 @@
     <div class="brand">Coisoteca</div>
     <h1>Placa Pílula</h1>
     
-    <div class="upload-zone">
+    <div class="upload-wrapper">
         <input type="file" id="fInput" accept="image/*">
-        <div style="color: var(--red); font-weight: bold;">Clique aqui para subir sua arte</div>
+        <div style="color: var(--red); font-weight: bold;">TOQUE PARA SUBIR ARTE</div>
     </div>
 
     <div id="pArea" class="preview-area">
         <div class="slot"><canvas id="pCanvas"></canvas></div>
-        <p id="loadingMsg" style="color: var(--red); font-weight: bold;">Processando vetor...</p>
-        <button id="dBtn" class="btn-main">Baixar SVG para Impressão</button>
+        <p id="loadingMsg" style="color: var(--red); font-weight: bold;">Vetorizando...</p>
+        <button id="dBtn" class="btn-main">BAIXAR ARQUIVO SVG</button>
     </div>
 
-    <div id="log">Aguardando imagem...</div>
+    <div id="log">Aguardando seleção...</div>
 </div>
 
 <script>
@@ -54,66 +75,66 @@
     const log = document.getElementById('log');
     let svgOut = "";
 
-    // Verificar se a biblioteca carregou
-    window.onload = () => {
+    // Teste imediato da biblioteca
+    window.addEventListener('load', () => {
         if (typeof ImageTracer !== 'undefined') {
-            log.innerHTML = "✅ Motor de conversão pronto.";
+            log.innerText = "✅ Sistema Pronto";
         } else {
-            log.innerHTML = "❌ Erro ao carregar ImageTracer. Recarregue a página.";
+            log.innerText = "❌ Erro: Motor não carregou";
         }
-    };
+    });
 
-    fInput.onchange = e => {
+    fInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
 
-        log.innerHTML = "Lendo arquivo...";
-        pArea.style.display = 'block';
-        loadingMsg.style.display = 'block';
-        dBtn.style.display = 'none';
-
+        log.innerText = "📸 Lendo: " + file.name;
+        
         const reader = new FileReader();
-        reader.onload = ev => {
+        
+        reader.onerror = () => { log.innerText = "❌ Erro ao ler arquivo"; };
+        
+        reader.onload = (ev) => {
             const img = new Image();
+            img.src = ev.target.result;
+            
             img.onload = () => {
+                log.innerText = "⚙️ Processando imagem...";
+                pArea.style.display = 'block';
+                dBtn.style.display = 'none';
+                loadingMsg.style.display = 'block';
+
                 const ctx = pCanvas.getContext('2d');
                 pCanvas.width = img.width;
                 pCanvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
 
-                log.innerHTML = "Vetorizando... (isso pode levar 3s)";
-
-                try {
-                    // Configuração otimizada para o Bambu Studio (menos pontos, curvas melhores)
-                    ImageTracer.imageToSVG(ev.target.result, function(s) {
-                        svgOut = s;
-                        loadingMsg.style.display = 'none';
-                        dBtn.style.display = 'block';
-                        log.innerHTML = "✅ Tudo pronto para baixar!";
-                    }, { 
-                        ltres: 1, 
-                        qtres: 1, 
-                        numberofcolors: 2, 
-                        pathomit: 20, // Ignora ruídos pequenos
-                        roundcoords: 1 // Coordenadas arredondadas para arquivos menores
-                    });
-                } catch (err) {
-                    log.innerHTML = "❌ Erro na conversão: " + err.message;
-                }
+                setTimeout(() => {
+                    try {
+                        ImageTracer.imageToSVG(ev.target.result, function(s) {
+                            svgOut = s;
+                            loadingMsg.style.display = 'none';
+                            dBtn.style.display = 'block';
+                            log.innerText = "✅ Vetorização concluída!";
+                        }, { ltres:1, qtres:1, numberofcolors:2, pathomit:15 });
+                    } catch(err) {
+                        log.innerText = "❌ Falha no motor: " + err;
+                    }
+                }, 500);
             };
-            img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
-    };
+    });
 
     dBtn.onclick = () => {
-        if (!svgOut) return;
+        if(!svgOut) return;
         const blob = new Blob([svgOut], {type: 'image/svg+xml'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'arte-coisoteca-pilula.svg';
+        a.download = 'coisoteca-pilula.svg';
         a.click();
+        log.innerText = "💾 Arquivo baixado!";
     };
 </script>
 
