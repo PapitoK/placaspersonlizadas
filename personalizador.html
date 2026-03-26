@@ -1,140 +1,92 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personalizador Pílula — Coisoteca</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+    <title>Personalizador Coisoteca</title>
     <script src="https://cdn.jsdelivr.net/npm/imagetracerjs@1.2.6/imagetracer.min.js"></script>
-
     <style>
-        :root { --red: #D23B40; --charcoal: #231F20; --cream: #FAF8F5; }
-        body { font-family: 'DM Sans', sans-serif; background-color: var(--cream); margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .card { background: #fff; width: 100%; max-width: 480px; padding: 35px; border-radius: 20px; border: 1px solid rgba(0,0,0,0.1); text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-        .brand { background: var(--red); color: white; font-size: 10px; font-weight: 700; padding: 4px 12px; border-radius: 3px; display: inline-block; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
-        h1 { font-family: 'Syne', sans-serif; font-size: 26px; margin: 0 0 25px 0; color: var(--charcoal); }
-        
-        /* Área de clique aumentada e forçada */
-        .upload-wrapper {
-            position: relative;
-            width: 100%;
-            height: 120px;
-            border: 2px dashed var(--red);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #fff;
-            transition: 0.3s;
-            overflow: hidden;
-        }
-        .upload-wrapper:hover { background: #FFF9F9; }
-        
-        #fInput {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
-            z-index: 10;
-        }
-
-        .preview-area { display: none; margin-top: 30px; }
-        .slot { width: 100%; aspect-ratio: 5/1; background: #E8E4E0; border-radius: 100px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 20px; border: 1px solid #ddd; }
-        canvas { max-width: 85%; max-height: 75%; filter: grayscale(1) contrast(150%); }
-        .btn-main { background: var(--red); color: white; border: none; padding: 18px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; display: none; }
-        #log { font-size: 12px; color: #666; margin-top: 15px; font-weight: bold; }
+        body { font-family: sans-serif; background: #FAF8F5; text-align: center; padding: 20px; }
+        .box { background: white; max-width: 400px; margin: auto; padding: 30px; border-radius: 15px; border: 1px solid #ddd; }
+        .btn-upload { background: #D23B40; color: white; padding: 15px; border-radius: 8px; cursor: pointer; display: block; font-weight: bold; }
+        #fInput { display: none; }
+        #preview { width: 100%; aspect-ratio: 5/1; background: #eee; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; }
+        canvas { max-width: 90%; max-height: 80%; }
+        #btn-down { background: #231F20; color: white; padding: 15px; border-radius: 8px; cursor: pointer; display: none; width: 100%; border: none; font-weight: bold; }
+        #status { margin-top: 15px; font-size: 13px; color: #666; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <div class="brand">Coisoteca</div>
-    <h1>Placa Pílula</h1>
+<div class="box">
+    <h2 style="color:#231F20">Placa Pílula</h2>
+    <p style="font-size:13px">Selecione sua arte em preto e branco</p>
+
+    <label for="fInput" class="btn-upload">ESCOLHER IMAGEM</label>
+    <input type="file" id="fInput" accept="image/*">
+
+    <div id="preview"><canvas id="c"></canvas></div>
     
-    <div class="upload-wrapper">
-        <input type="file" id="fInput" accept="image/*">
-        <div style="color: var(--red); font-weight: bold;">TOQUE PARA SUBIR ARTE</div>
-    </div>
-
-    <div id="pArea" class="preview-area">
-        <div class="slot"><canvas id="pCanvas"></canvas></div>
-        <p id="loadingMsg" style="color: var(--red); font-weight: bold;">Vetorizando...</p>
-        <button id="dBtn" class="btn-main">BAIXAR ARQUIVO SVG</button>
-    </div>
-
-    <div id="log">Aguardando seleção...</div>
+    <div id="status">Aguardando motor...</div>
+    <button id="btn-down">BAIXAR ARQUIVO SVG</button>
 </div>
 
 <script>
     const fInput = document.getElementById('fInput');
-    const pArea = document.getElementById('pArea');
-    const pCanvas = document.getElementById('pCanvas');
-    const dBtn = document.getElementById('dBtn');
-    const loadingMsg = document.getElementById('loadingMsg');
-    const log = document.getElementById('log');
-    let svgOut = "";
+    const status = document.getElementById('status');
+    const btnDown = document.getElementById('btn-down');
+    const preview = document.getElementById('preview');
+    const canvas = document.getElementById('c');
+    let svgStr = "";
 
-    // Teste imediato da biblioteca
-    window.addEventListener('load', () => {
-        if (typeof ImageTracer !== 'undefined') {
-            log.innerText = "✅ Sistema Pronto";
+    // Verifica se a lib carregou
+    window.onload = () => {
+        if(typeof ImageTracer !== 'undefined') {
+            status.innerText = "✅ Motor pronto";
         } else {
-            log.innerText = "❌ Erro: Motor não carregou";
+            status.innerText = "❌ Erro ao carregar motor. Atualize a página.";
         }
-    });
+    };
 
-    fInput.addEventListener('change', function(e) {
+    fInput.onchange = function(e) {
         const file = e.target.files[0];
-        if (!file) return;
+        if(!file) return;
 
-        log.innerText = "📸 Lendo: " + file.name;
+        status.innerText = "Processando: " + file.name;
         
         const reader = new FileReader();
-        
-        reader.onerror = () => { log.innerText = "❌ Erro ao ler arquivo"; };
-        
-        reader.onload = (ev) => {
+        reader.onload = function(event) {
             const img = new Image();
-            img.src = ev.target.result;
-            
-            img.onload = () => {
-                log.innerText = "⚙️ Processando imagem...";
-                pArea.style.display = 'block';
-                dBtn.style.display = 'none';
-                loadingMsg.style.display = 'block';
-
-                const ctx = pCanvas.getContext('2d');
-                pCanvas.width = img.width;
-                pCanvas.height = img.height;
+            img.src = event.target.result;
+            img.onload = function() {
+                // Desenha preview
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
+                preview.style.display = 'flex';
 
-                setTimeout(() => {
-                    try {
-                        ImageTracer.imageToSVG(ev.target.result, function(s) {
-                            svgOut = s;
-                            loadingMsg.style.display = 'none';
-                            dBtn.style.display = 'block';
-                            log.innerText = "✅ Vetorização concluída!";
-                        }, { ltres:1, qtres:1, numberofcolors:2, pathomit:15 });
-                    } catch(err) {
-                        log.innerText = "❌ Falha no motor: " + err;
-                    }
-                }, 500);
+                // Converte para SVG
+                try {
+                    ImageTracer.imageToSVG(event.target.result, function(svg) {
+                        svgStr = svg;
+                        btnDown.style.display = 'block';
+                        status.innerText = "✅ Pronto para baixar!";
+                    }, { ltres:1, qtres:1, numberofcolors:2 });
+                } catch(err) {
+                    status.innerText = "Erro na conversão.";
+                }
             };
         };
         reader.readAsDataURL(file);
-    });
+    };
 
-    dBtn.onclick = () => {
-        if(!svgOut) return;
-        const blob = new Blob([svgOut], {type: 'image/svg+xml'});
+    btnDown.onclick = function() {
+        const blob = new Blob([svgStr], {type: 'image/svg+xml'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'coisoteca-pilula.svg';
+        a.download = 'coisoteca.svg';
         a.click();
-        log.innerText = "💾 Arquivo baixado!";
     };
 </script>
 
