@@ -8,25 +8,31 @@
     <style>
         :root { --red: #D23B40; --green: #28a745; --cream: #FAF8F5; --charcoal: #231F20; }
         body { font-family: sans-serif; background: var(--cream); padding: 20px; color: var(--charcoal); }
-        .box { background: white; max-width: 550px; margin: auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .box { background: white; max-width: 500px; margin: auto; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
         
-        /* Lista de Validação */
-        .validation-list { text-align: left; background: #f8f9fa; border-radius: 12px; padding: 20px; margin: 20px 0; border: 1px solid #eee; }
-        .v-item { display: flex; align-items: center; margin-bottom: 10px; font-size: 14px; color: #666; }
-        .v-item b { margin-right: 10px; font-size: 18px; }
-        .pending { color: #ccc; }
-        .success { color: var(--green); font-weight: bold; }
-        .error { color: var(--red); font-weight: bold; }
-        .warning { color: #856404; font-weight: bold; }
-
-        .upload-area { border: 2px dashed #ccc; padding: 40px; border-radius: 15px; cursor: pointer; position: relative; background: #fff; transition: 0.3s; }
+        /* Área de Upload */
+        .upload-area { border: 2px dashed #ccc; padding: 30px; border-radius: 15px; cursor: pointer; position: relative; background: #fff; margin-bottom: 20px; }
         .upload-area:hover { border-color: var(--red); }
         input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
+        /* Lista de Checagem */
+        .check-list { text-align: left; margin: 20px 0; padding: 0; list-style: none; }
+        .check-item { 
+            padding: 12px; margin-bottom: 8px; border-radius: 8px; 
+            background: #f9f9f9; display: flex; align-items: center; 
+            font-size: 14px; border: 1px solid #eee; transition: 0.3s;
+        }
+        .check-item b { margin-right: 15px; font-size: 18px; width: 20px; text-align: center; }
+        
+        /* Cores dos Estados */
+        .pending { color: #999; }
+        .ok { background: #eeffee; border-color: #ccffcc; color: var(--green); }
+        .fail { background: #ffeeee; border-color: #ffcccc; color: var(--red); }
+        .warn { background: #fff9e6; border-color: #ffeeb3; color: #856404; }
+
         #preview-container { width: 100%; aspect-ratio: 5/1; background: #eee; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ddd; }
         #preview-img { max-width: 90%; max-height: 80%; }
-        
-        #btn-down { background: var(--charcoal); color: white; padding: 18px; width: 100%; border-radius: 12px; cursor: pointer; display: none; border: none; font-weight: bold; font-size: 16px; }
+        #btn-down { background: var(--charcoal); color: white; padding: 18px; width: 100%; border-radius: 12px; cursor: pointer; display: none; border: none; font-weight: bold; font-size: 16px; margin-top: 10px; }
         canvas { display: none; }
     </style>
 </head>
@@ -34,26 +40,29 @@
 
 <div class="box">
     <div style="background:var(--red); color:white; font-size:10px; padding:4px 10px; display:inline-block; border-radius:4px; margin-bottom:10px; font-weight:bold;">COISOTECA</div>
-    <h2>Validador de Arquivo</h2>
+    <h2 style="margin-top:0;">Validador de Arte</h2>
     
     <div class="upload-area">
         <input type="file" id="fInput" accept="image/*, application/pdf">
-        <strong>Arraste ou selecione o arquivo</strong>
+        <strong>Clique ou arraste o arquivo aqui</strong>
     </div>
 
-    <div class="validation-list" id="v-list">
-        <div class="v-item pending" id="v-format"><b>○</b> Formato de arquivo (PDF/PNG/JPG)</div>
-        <div class="v-item pending" id="v-size"><b>○</b> Dimensões exatas (25x5cm / 300 DPI)</div>
-        <div class="v-item pending" id="v-color"><b>○</b> Conversão Preto e Branco (Limiar)</div>
-        <div class="v-item pending" id="v-thickness"><b>○</b> Espessura mínima de traço (1.0mm)</div>
-    </div>
+    <ul class="check-list" id="checkList">
+        <li class="check-item pending" id="c-format"><b>○</b> Formato (PDF, PNG ou JPG)</li>
+        <li class="check-item pending" id="c-size"><b>○</b> Dimensões (25x5cm / 300 DPI)</li>
+        <li class="check-item pending" id="c-color"><b>○</b> Cores (Conversão para P&B)</li>
+        <li class="check-item pending" id="c-thick"><b>○</b> Espessura mínima (Traços > 1mm)</li>
+    </ul>
 
     <div id="preview-container"><img id="preview-img"></div>
-    <button id="btn-down">BAIXAR ARQUIVO PARA IMPRESSÃO</button>
+    <button id="btn-down">BAIXAR ARQUIVO VALIDADO</button>
     <canvas id="c"></canvas>
 </div>
 
 <script>
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
     const fInput = document.getElementById('fInput');
     const btnDown = document.getElementById('btn-down');
     const previewImg = document.getElementById('preview-img');
@@ -63,13 +72,13 @@
 
     const TARGET_W = 2953; 
     const TARGET_H = 591;
-    const MIN_LINE_PX = 11.5; // Aproximadamente 1mm
+    const MIN_LINE_PX = 11.5; // Espessura de 1mm em pixels
 
-    function setStatus(id, type, text) {
+    function updateCheck(id, status, text) {
         const el = document.getElementById(id);
-        const icons = { pending: '○', success: '✅', error: '❌', warning: '⚠️' };
-        el.className = 'v-item ' + type;
-        el.innerHTML = `<b>${icons[type]}</b> ${text}`;
+        const icons = { pending: '○', ok: '✅', fail: '❌', warn: '⚠️' };
+        el.className = 'check-item ' + status;
+        el.innerHTML = `<b>${icons[status]}</b> ${text}`;
     }
 
     fInput.onchange = (e) => handleFile(e.target.files[0]);
@@ -77,22 +86,24 @@
     async function handleFile(file) {
         if (!file) return;
 
-        // Reset
+        // Reset da interface
         btnDown.style.display = 'none';
         previewContainer.style.display = 'none';
-        ['v-format','v-size','v-color','v-thickness'].forEach(id => setStatus(id, 'pending', document.getElementById(id).innerText.substring(2)));
+        updateCheck('c-format', 'pending', 'Formato (PDF, PNG ou JPG)');
+        updateCheck('c-size', 'pending', 'Dimensões (25x5cm / 300 DPI)');
+        updateCheck('c-color', 'pending', 'Cores (Conversão para P&B)');
+        updateCheck('c-thick', 'pending', 'Espessura mínima (Traços > 1mm)');
 
-        // 1. Validar Formato
+        // 1. Checagem de Formato
         if (["image/png", "image/jpeg", "application/pdf"].includes(file.type)) {
-            setStatus('v-format', 'success', 'Formato suportado');
+            updateCheck('c-format', 'ok', 'Formato aceito');
         } else {
-            setStatus('v-format', 'error', 'Formato não aceito (Use PDF/PNG/JPG)');
+            updateCheck('c-format', 'fail', 'Formato inválido! Use PDF, PNG ou JPG');
             return;
         }
 
+        // Leitura do arquivo
         if (file.type === "application/pdf") {
-            const pdfjsLib = window['pdfjs-dist/build/pdf'];
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
             const page = await pdf.getPage(1);
@@ -100,32 +111,31 @@
             canvas.width = viewport.width; canvas.height = viewport.height;
             await page.render({ canvasContext: ctx, viewport: viewport }).promise;
             const img = new Image();
-            img.onload = () => validateAll(img);
+            img.onload = () => processAll(img);
             img.src = canvas.toDataURL();
         } else {
             const reader = new FileReader();
             reader.onload = (ev) => {
                 const img = new Image();
-                img.onload = () => validateAll(img);
+                img.onload = () => processAll(img);
                 img.src = ev.target.result;
             };
             reader.readAsDataURL(file);
         }
     }
 
-    function validateAll(img) {
-        // 2. Validar Tamanho
-        const diffW = Math.abs(img.width - TARGET_W);
-        const diffH = Math.abs(img.height - TARGET_H);
+    function processAll(img) {
+        // 2. Checagem de Tamanho (Tolerância de 150px para pequenas variações de exportação)
+        const isSizeOk = Math.abs(img.width - TARGET_W) < 150 && Math.abs(img.height - TARGET_H) < 150;
         
-        if (diffW < 150 && diffH < 150) {
-            setStatus('v-size', 'success', `Tamanho correto: 25x5cm (${img.width}px)`);
+        if (isSizeOk) {
+            updateCheck('c-size', 'ok', `Tamanho correto: 25x5cm`);
         } else {
-            setStatus('v-size', 'error', `Tamanho incorreto: ${img.width}x${img.height}px. Ajuste para 2953x591px.`);
+            updateCheck('c-size', 'fail', `Tamanho errado: ${img.width}x${img.height}px (Use 2953x591px)`);
             return;
         }
 
-        // 3. Processar P&B
+        // 3. Processamento de Cores e P&B
         canvas.width = TARGET_W; canvas.height = TARGET_H;
         ctx.fillStyle = "white"; ctx.fillRect(0, 0, TARGET_W, TARGET_H);
         ctx.drawImage(img, 0, 0, TARGET_W, TARGET_H);
@@ -134,34 +144,38 @@
         const data = imgData.data;
         for (let i = 0; i < data.length; i += 4) {
             const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-            const v = avg < 110 ? 0 : 255; // Threshold
+            const v = avg < 120 ? 0 : 255; // Se for escuro vira preto, se for claro vira branco (remove template cinza)
             data[i] = data[i+1] = data[i+2] = v;
         }
         ctx.putImageData(imgData, 0, 0);
-        setStatus('v-color', 'success', 'Conversão P&B aplicada (Template removido)');
+        updateCheck('c-color', 'ok', 'Cores convertidas e template removido');
 
-        // 4. Validar Espessura (1mm)
-        let thinFound = false;
-        // Amostragem em grade para detectar linhas finas
-        for (let y = 10; y < TARGET_H; y += 20) {
-            let count = 0;
+        // 4. Checagem de Espessura (1mm)
+        let hasThinLines = false;
+        // Varredura por amostragem
+        for (let y = 10; y < TARGET_H; y += 30) {
+            let blackPixelCount = 0;
             for (let x = 0; x < TARGET_W; x++) {
                 const idx = (y * TARGET_W + x) * 4;
-                if (data[idx] === 0) count++;
-                else {
-                    if (count > 0 && count < MIN_LINE_PX) thinFound = true;
-                    count = 0;
+                if (data[idx] === 0) {
+                    blackPixelCount++;
+                } else {
+                    if (blackPixelCount > 0 && blackPixelCount < MIN_LINE_PX) {
+                        hasThinLines = true;
+                        break;
+                    }
+                    blackPixelCount = 0;
                 }
             }
         }
 
-        if (!thinFound) {
-            setStatus('v-thickness', 'success', 'Espessura de traço segura (>1mm)');
+        if (!hasThinLines) {
+            updateCheck('c-thick', 'ok', 'Espessura de traços segura (>1mm)');
         } else {
-            setStatus('v-thickness', 'warning', 'Atenção: Traços menores que 1mm detectados.');
+            updateCheck('c-thick', 'warn', 'Traços muito finos detectados (<1mm)');
         }
 
-        // Finalizar
+        // Exibir resultado final
         previewImg.src = canvas.toDataURL("image/png");
         previewContainer.style.display = 'flex';
         btnDown.style.display = 'block';
@@ -169,7 +183,7 @@
 
     btnDown.onclick = () => {
         const link = document.createElement('a');
-        link.download = 'arte-finalizada-coisoteca.png';
+        link.download = 'arte-validada-coisoteca.png';
         link.href = canvas.toDataURL("image/png");
         link.click();
     };
