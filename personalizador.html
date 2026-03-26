@@ -10,7 +10,7 @@
         body { font-family: sans-serif; background: var(--cream); text-align: center; padding: 20px; }
         .box { background: white; max-width: 420px; margin: auto; padding: 30px; border-radius: 20px; border: 1px solid #ddd; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
         input[type=file] { width: 100%; padding: 20px; border: 2px dashed var(--red); border-radius: 10px; margin-bottom: 20px; cursor: pointer; box-sizing: border-box; }
-        #preview { width: 100%; aspect-ratio: 5/1; background: #E8E4E0; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; overflow: hidden; }
+        #preview { width: 100%; aspect-ratio: 5/1; background: #E8E4E0; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ccc; }
         canvas { max-width: 90%; max-height: 80%; }
         #btn-down { background: #231F20; color: white; padding: 18px; width: 100%; border-radius: 8px; cursor: pointer; display: none; border: none; font-weight: bold; }
         #status { margin-top: 15px; font-size: 13px; font-weight: bold; color: #666; }
@@ -20,9 +20,9 @@
 
 <div class="box">
     <h1 style="font-size: 22px;">Placa Pílula</h1>
-    <p style="font-size: 13px; color: #666;">Suba um arquivo <b>PNG ou JPG</b></p>
+    <p style="font-size: 13px; color: #666;">Aceita PNG (Transparente ou Branco)</p>
 
-    <input type="file" id="fInput" accept="image/png, image/jpeg">
+    <input type="file" id="fInput" accept="image/*">
 
     <div id="preview"><canvas id="c"></canvas></div>
     
@@ -38,15 +38,13 @@
     const canvas = document.getElementById('c');
     let svgStr = "";
 
-    window.onload = () => {
-        if(typeof ImageTracer !== 'undefined') status.innerText = "✅ Sistema pronto";
-    };
+    window.onload = () => { if(typeof ImageTracer !== 'undefined') status.innerText = "✅ Sistema pronto"; };
 
     fInput.onchange = function(e) {
         const file = e.target.files[0];
         if(!file) return;
 
-        status.innerText = "⏳ Lendo arquivo...";
+        status.innerText = "⏳ Processando...";
         const reader = new FileReader();
 
         reader.onload = function(event) {
@@ -54,34 +52,35 @@
             img.src = event.target.result;
 
             img.onload = function() {
-                // 1. Preparar o Canvas
                 const ctx = canvas.getContext('2d');
                 canvas.width = img.width;
                 canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                preview.style.display = 'flex';
-                
-                status.innerText = "⚙️ Convertendo para Vetor...";
 
-                // 2. Tentar conversão com tratamento de erro
+                // O PULO DO GATO: Preencher o fundo com Branco antes de desenhar a imagem
+                // Isso resolve o problema da transparência (PNG transparente)
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                
+                preview.style.display = 'flex';
+                status.innerText = "⚙️ Gerando vetor...";
+
+                // Converter os dados processados do Canvas (em vez do arquivo bruto)
+                // Isso garante que o ImageTracer veja apenas Preto e Branco sólidos
                 try {
-                    // Pegamos os dados da imagem direto do canvas (mais seguro)
-                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL("image/jpeg", 0.9); // Converte para JPG p/ remover transparência
                     
-                    ImageTracer.imageToSVG(event.target.result, function(svg) {
+                    ImageTracer.imageToSVG(dataUrl, function(svg) {
                         svgStr = svg;
                         btnDown.style.display = 'block';
-                        status.innerText = "✅ Concluído!";
+                        status.innerText = "✅ Sucesso! Pode baixar.";
                     }, {
-                        ltres: 1,
-                        qtres: 1,
-                        numberofcolors: 2,
-                        pal: [{r:0,g:0,b:0,a:255}, {r:255,g:255,b:255,a:255}], // Força Preto e Branco
+                        ltres: 1, qtres: 1, numberofcolors: 2,
+                        pal: [{r:0,g:0,b:0,a:255}, {r:255,g:255,b:255,a:255}],
                         pathomit: 20
                     });
                 } catch(err) {
-                    console.error(err);
-                    status.innerText = "❌ Erro técnico na conversão.";
+                    status.innerText = "❌ Erro na conversão. Tente outra imagem.";
                 }
             };
         };
