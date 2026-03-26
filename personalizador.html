@@ -20,65 +20,68 @@ function processAll(img) {
         }
         updateCheck('c-color', 'ok', 'Cores OK');
 
-        // 2. Criar Canvas de Preview para desenhar os erros
+        // 2. Canvas de Preview
         let errorCanvas = document.createElement('canvas');
         errorCanvas.width = TARGET_W; errorCanvas.height = TARGET_H;
         let eCtx = errorCanvas.getContext('2d');
-        eCtx.putImageData(imgData, 0, 0); // Começa com a imagem P&B limpa
-        eCtx.fillStyle = "rgba(210, 59, 64, 0.8)"; // Vermelho Coisoteca com leve transparência
+        eCtx.putImageData(imgData, 0, 0);
+        eCtx.fillStyle = "rgba(210, 59, 64, 0.9)"; // Vermelho mais opaco
 
+        let hasError = false;
         let errorCount = 0;
 
-        // 3. SCANNER HORIZONTAL (Detecta linhas verticais finas)
-        for (let y = 0; y < TARGET_H; y += 3) { // Salto de 3px para não pesar tanto, mas ler tudo
+        // 3. SCANNER HORIZONTAL (Detecta larguras finas - Ex: Pontos, Linhas Verticais)
+        for (let y = 0; y < TARGET_H; y += 2) { 
             let streak = 0;
             for (let x = 0; x < TARGET_W; x++) {
                 if (data[(y * TARGET_W + x) * 4] === 0) {
                     streak++;
                 } else {
                     if (streak > 0 && streak < MIN_LINE_PX) {
-                        // Marca o erro no canvas de preview
-                        eCtx.fillRect(x - streak, y - 5, streak, 10); 
+                        eCtx.fillRect(x - streak, y - 4, streak, 8);
                         errorCount++;
+                        hasError = true;
                     }
                     streak = 0;
                 }
             }
         }
 
-        // 4. SCANNER VERTICAL (Detecta linhas horizontais finas)
-        for (let x = 0; x < TARGET_W; x += 10) { 
+        // 4. SCANNER VERTICAL (Detecta alturas finas - Ex: A sua linha comprida horizontal)
+        // Agora ele varre pixel por pixel lateralmente também
+        for (let x = 0; x < TARGET_W; x += 2) { 
             let streak = 0;
             for (let y = 0; y < TARGET_H; y++) {
                 if (data[(y * TARGET_W + x) * 4] === 0) {
                     streak++;
                 } else {
                     if (streak > 0 && streak < MIN_LINE_PX) {
-                        eCtx.fillRect(x - 5, y - streak, 10, streak);
+                        // Marca o erro da linha horizontal fina
+                        eCtx.fillRect(x - 4, y - streak, 8, streak);
                         errorCount++;
+                        hasError = true;
                     }
                     streak = 0;
                 }
             }
         }
 
-        if (errorCount > 0) {
-            updateCheck('c-thick', 'fail', `${errorCount} pontos críticos detectados (<1mm)`);
-            previewMsg.innerText = "⚠️ Corrija os pontos vermelhos para imprimir";
+        if (hasError) {
+            updateCheck('c-thick', 'fail', `Erros detectados: ajuste os traços vermelhos.`);
+            previewMsg.innerText = "⚠️ Linhas finas detectadas (vermelho)";
             previewMsg.style.color = "var(--red)";
         } else {
-            updateCheck('c-thick', 'ok', 'Espessura aprovada em toda a arte');
-            previewMsg.innerText = "✅ Arte perfeita para impressão";
+            updateCheck('c-thick', 'ok', 'Espessura aprovada!');
+            previewMsg.innerText = "✅ Arte pronta para impressão";
             previewMsg.style.color = "var(--green)";
         }
 
-        // Atualiza Preview e Botão
         previewImg.src = errorCanvas.toDataURL("image/png");
         previewContainer.style.display = 'flex';
         btnDown.style.display = 'block';
 
         btnDown.onclick = () => {
-            ctx.putImageData(imgData, 0, 0); // Download sempre limpo
+            ctx.putImageData(imgData, 0, 0);
             const link = document.createElement('a');
             link.download = 'placa_coisoteca.png';
             link.href = canvas.toDataURL("image/png");
