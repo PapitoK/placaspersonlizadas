@@ -13,14 +13,14 @@
         #preview { width: 100%; aspect-ratio: 5/1; background: #E8E4E0; border-radius: 50px; margin: 20px 0; display: none; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #ccc; }
         canvas { max-width: 90%; max-height: 80%; }
         #btn-down { background: #231F20; color: white; padding: 18px; width: 100%; border-radius: 8px; cursor: pointer; display: none; border: none; font-weight: bold; }
-        #status { margin-top: 15px; font-size: 13px; font-weight: bold; color: #666; }
+        #status { margin-top: 15px; font-size: 13px; font-weight: bold; color: #666; min-height: 1.2em; }
     </style>
 </head>
 <body>
 
 <div class="box">
     <h1 style="font-size: 22px;">Placa Pílula</h1>
-    <p style="font-size: 13px; color: #666;">Aceita PNG (Transparente ou Branco)</p>
+    <p style="font-size: 13px; color: #666;">Arte em Preto (Fundo Branco ou Transparente)</p>
 
     <input type="file" id="fInput" accept="image/*">
 
@@ -49,40 +49,43 @@
 
         reader.onload = function(event) {
             const img = new Image();
-            img.src = event.target.result;
-
             img.onload = function() {
                 const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
+                
+                // Redimensiona se a imagem for muito grande para evitar erro de memória
+                let scale = 1;
+                if(img.width > 1500) scale = 1500 / img.width;
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
 
-                // O PULO DO GATO: Preencher o fundo com Branco antes de desenhar a imagem
-                // Isso resolve o problema da transparência (PNG transparente)
+                // Desenha fundo branco e imagem
                 ctx.fillStyle = "#FFFFFF";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
                 preview.style.display = 'flex';
                 status.innerText = "⚙️ Gerando vetor...";
 
-                // Converter os dados processados do Canvas (em vez do arquivo bruto)
-                // Isso garante que o ImageTracer veja apenas Preto e Branco sólidos
-                try {
-                    const dataUrl = canvas.toDataURL("image/jpeg", 0.9); // Converte para JPG p/ remover transparência
-                    
-                    ImageTracer.imageToSVG(dataUrl, function(svg) {
-                        svgStr = svg;
-                        btnDown.style.display = 'block';
-                        status.innerText = "✅ Sucesso! Pode baixar.";
-                    }, {
-                        ltres: 1, qtres: 1, numberofcolors: 2,
-                        pal: [{r:0,g:0,b:0,a:255}, {r:255,g:255,b:255,a:255}],
-                        pathomit: 20
-                    });
-                } catch(err) {
-                    status.innerText = "❌ Erro na conversão. Tente outra imagem.";
-                }
+                // Pequeno delay para o navegador respirar
+                setTimeout(() => {
+                    try {
+                        // Opção simplificada: imageToSVG com o canvas diretamente
+                        // O ImageTracer pode receber um objeto de imagem do canvas
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        
+                        ImageTracer.imageToSVG(imgData, function(svg) {
+                            svgStr = svg;
+                            btnDown.style.display = 'block';
+                            status.innerText = "✅ Sucesso!";
+                        }, 'grayscale'); // O modo 'grayscale' é o mais estável da lib
+                        
+                    } catch(err) {
+                        status.innerText = "❌ Erro no processamento. Tente outra imagem.";
+                        console.error(err);
+                    }
+                }, 100);
             };
+            img.src = event.target.result;
         };
         reader.readAsDataURL(file);
     };
